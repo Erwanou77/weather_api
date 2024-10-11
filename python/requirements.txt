@@ -4,3 +4,5 @@ sqlalchemy
 Flask
 requests
 pymongo
+PyMySQL
+cryptography

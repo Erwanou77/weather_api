@@ -5,9 +5,6 @@ from dotenv import load_dotenv
 import os, create_table, json, threading, batch
 # Load environment variables from .env file
 load_dotenv()
-
-t = threading.Thread(target=batch.main)
-t.start()
 app = Flask(__name__)
 
 # Configure the database connection
@@ -58,9 +55,22 @@ def search():
 
 @app.route('/<identifiant>',methods=['GET'])
 def meteo(identifiant):
-    print(identifiant)
+    identifiant = "('"+"', '".join([i.strip() for i in identifiant.split(',')])+"')"
+    query_sql = text(f"""
+            SELECT latitude,longitude FROM {table} 
+            WHERE label IN :search_term 
+            OR department_name IN :search_term 
+            OR CAST( zip_code AS CHAR(5) ) IN :search_term
+            OR region_name IN :search_term
+        """)
+    req = session.execute(query_sql, {'search_term': f'%{query}%'})
+
+    rows = req.fetchone()
+
     return render_template('index.html')
 
 if __name__ == '__main__':
     #create_table.main() # La decommenter pour lancer la creation de la table
+    t = threading.Thread(target=batch.main)
+    t.start()
     app.run(debug=True)
