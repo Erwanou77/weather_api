@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, jsonify
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
-import os, create_table, json, threading, batch
+import os, create_table, json, threading, batch, requests
 # Load environment variables from .env file
 load_dotenv()
 app = Flask(__name__)
@@ -20,36 +20,56 @@ def index():
 
 @app.route('/search', methods=['POST'])
 def search():
-    # Get the search term from the form
-    data = request.get_json()  # Get JSON data from the request
-    query = data.get('query', '')
+    data = request.get_json()
+    query = f"%{data.get('query', '').strip()}%"
     
-    # Create a new session
-    session = Session()
-    results = []
-
-    try:
-        # Prepare the SQL query
-        query_sql = text(f"""
-            SELECT label,department_name,zip_code,region_name FROM {table} 
+    with Session() as session:
+        
+        # Cherche dans notre base si les données existe
+        result = session.execute(text(f"""
+            SELECT label, department_name, zip_code, region_name 
+            FROM {table} 
             WHERE label LIKE :search_term 
             OR department_name LIKE :search_term 
-            OR zip_code LIKE :search_term
-            OR region_name LIKE :search_term LIMIT 20
-        """)
-        
-        
-        # Execute the query with the search term
-        req = session.execute(query_sql, {'search_term': f'%{query}%'})
+            OR zip_code LIKE :search_term 
+            OR region_name LIKE :search_term 
+            LIMIT 20
+        """), {'search_term': query}).fetchall()
 
-        rows = req.fetchall()
+        if result:
+            return jsonify([dict(row) for row in result])
 
-        for row in rows:
-            results.append(json.dumps(list(row)))
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    finally:
-        session.close()  # Always close the session
+        # Recherche dans l'api de l'état pour vérifier si l'adresse existe
+        api_response = requests.get(f"https://api-adresse.data.gouv.fr/search/?q={data['query']}&limit=20")
+        if api_response.status_code != 200:
+            return jsonify({"message": "External API error"}), api_response.status_code
+        
+        api_data = api_response.json().get('features', [])
+        if not api_data:
+            return jsonify({"message": "No results found"}), 404
+
+        # Boucle pour stocker les données de l'api de l'état dans notre base
+        results = []
+        for feature in api_data:
+            city_data = {
+                'insee_code': feature['properties']['citycode'],
+                'label': feature['properties']['city'],
+                'department_name': feature['properties']['context'].split(", ")[-2],
+                'zip_code': feature['properties']['postcode'],
+                'region_name': feature['properties']['context'].split(", ")[-1],
+                'latitude': feature['geometry']['coordinates'][1],
+                'longitude': feature['geometry']['coordinates'][0]
+            }
+
+            fields = ', '.join(city_data.keys())
+            placeholders = ', '.join([f":{key}" for key in city_data.keys()])
+
+            session.execute(text(f"""
+                INSERT INTO {table} ({fields}) 
+                VALUES ({placeholders})
+            """), city_data)
+            results.append(city_data)
+        session.commit()
 
     return jsonify(results)
 
