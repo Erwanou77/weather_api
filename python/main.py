@@ -55,19 +55,35 @@ def search():
 
 @app.route('/<identifiant>',methods=['GET'])
 def meteo(identifiant):
-    identifiant = "('"+"', '".join([i.strip() for i in identifiant.split(',')])+"')"
+    session = Session()
+    identifiant = [i.strip() for i in identifiant.split(',')]
     query_sql = text(f"""
             SELECT latitude,longitude FROM {table} 
             WHERE label IN :search_term 
             OR department_name IN :search_term 
             OR CAST( zip_code AS CHAR(5) ) IN :search_term
-            OR region_name IN :search_term
+            OR region_name IN :search_term LIMIT 1
         """)
-    req = session.execute(query_sql, {'search_term': f'%{query}%'})
+    req = session.execute(query_sql, {'search_term': identifiant})
 
-    rows = req.fetchone()
+    row = req.fetchone()
 
-    return render_template('index.html')
+    return render_template('meteo.html', result=identifiant, lat=row[0], lon=row[1])
+@app.route('/api/<longitude>/<latitude>',methods=['GET'])
+def api_meteo(longitude,latitude):
+    response = requests.get(f'{url}?appid={key}&exclude=minutely,hourly,daily,alerts&units=metric&lang=fr&lat={row[1]}&lon={row[0]}')
+    if response.status_code == 200:
+        data = response.json()
+        return jsonify({
+            'temp': data['main']['temp'],
+            'description': data['weather'][0]['description'],
+            'humidity': data['main']['humidity'],
+            'lat': data['coord']['lat'],
+            'lon': data['coord']['lon'],
+            'time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        })
+    
+
 
 if __name__ == '__main__':
     create_table.main()
