@@ -7,7 +7,7 @@ import os
 load_dotenv()
 def main():
     # Step 1: Read CSV file
-    csv_file_path = '../data/cities.csv'
+    csv_file_path = './data/cities.csv'
     df = pd.read_csv(csv_file_path)
 
     # Step 2: Create a connection to MySQL Database

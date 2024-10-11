@@ -159,6 +159,6 @@ def api_meteo(longitude,latitude):
 
 if __name__ == '__main__':
     create_table.main()
-    # t = threading.Thread(target=batch.main)
-    # t.start()
-    app.run(debug=True)
+    t = threading.Thread(target=batch.main)
+    t.start()
+    app.run(host="0.0.0.0", port=5000, debug=True)
