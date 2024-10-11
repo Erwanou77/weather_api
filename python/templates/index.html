@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Map - {{ city }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        /* Additional styles for autocomplete */
+        .autocomplete-suggestions {
+            margin-top: 10px;
+            border: 1px solid #ccc;
+            max-height: 200px;
+            overflow-y: auto;
+            position: absolute;
+            background: white;
+            z-index: 1000;
+            width: calc(100% - 1rem); /* Account for padding */
+        }
+        .autocomplete-suggestion {
+            padding: 10px;
+            cursor: pointer;
+        }
+        .autocomplete-suggestion:hover {
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <!-- Navbar -->
+    <nav class="bg-blue-600 p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <a href="#" class="text-white text-lg font-semibold">Weather App</a>
+            <ul class="flex space-x-4"></ul>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-6">
+        <hr class="my-6">
+        <div class="relative flex flex gap-4"></div>
+            <label for="search-term" class="text-gray-700 w-1/4">Rechercher une ville</label>
+            <input type="text" id="search-term" name="search_term" class="border border-gray-300 p-2 rounded w-2/4" required>
+            <div id="autocomplete-list" class="autocomplete-suggestions"></div> <!-- Autocomplete suggestions will appear here -->
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-blue-600 p-4 mt-10">
+        <div class="container mx-auto text-center text-white">
+            <p>&copy; 2024 Weather App. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        const searchInput = document.getElementById('search-term');
+        const autocompleteList = document.getElementById('autocomplete-list');
+
+        searchInput.addEventListener('input', function() {
+            const query = searchInput.value;
+
+            if (query.length < 1) {
+                autocompleteList.innerHTML = ''; // Clear suggestions if input is empty
+                return;
+            }
+
+            // Fetch suggestions from the server using POST
+            fetch('/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ query: query }) // Send query as JSON
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Clear previous suggestions
+                autocompleteList.innerHTML = '';
+                
+                // Populate the suggestions
+                data.forEach(item => {
+                    list_item=JSON.parse(item).join(', ')
+                    const suggestion = document.createElement('div');
+                    suggestion.classList.add('autocomplete-suggestion');
+                    suggestion.textContent = list_item; // Adjust to your data structure
+                    suggestion.addEventListener('click', function() {
+                        window.location.href = `/${encodeURIComponent(list_item)}`;
+                    });
+                    autocompleteList.appendChild(suggestion);
+                });
+            })
+            .catch(error => console.error('Error fetching suggestions:', error));
+        });
+    </script>
+    
+</body>
+</html>

@@ -1,0 +1,6 @@
+pandas
+python-dotenv
+sqlalchemy
+Flask
+requests
+pymongo
