@@ -32,7 +32,7 @@ def search():
     with Session() as session:
         
         # Cherche dans notre base si les données existe
-        result = session.execute(text(f"""
+        query_sql = text(f"""
             SELECT label, department_name, zip_code, region_name 
             FROM {table} 
             WHERE label LIKE :search_term 
@@ -40,10 +40,14 @@ def search():
             OR zip_code LIKE :search_term 
             OR region_name LIKE :search_term 
             LIMIT 20
-        """), {'search_term': query}).fetchall()
+        """)
 
-        if result:
-            return jsonify([dict(row) for row in result])
+        result = session.execute(query_sql, {'search_term': query})
+        rows = result.fetchall()
+
+        if rows:
+            keys = result.keys()
+            return jsonify([dict(zip(keys, row)) for row in rows])
 
         # Recherche dans l'api de l'état pour vérifier si l'adresse existe
         api_response = requests.get(f"https://api-adresse.data.gouv.fr/search/?q={data['query']}&limit=20")
@@ -155,6 +159,6 @@ def api_meteo(longitude,latitude):
 
 if __name__ == '__main__':
     create_table.main()
-    t = threading.Thread(target=batch.main)
-    t.start()
+    # t = threading.Thread(target=batch.main)
+    # t.start()
     app.run(debug=True)
