@@ -70,7 +70,7 @@ def meteo(identifiant):
     return render_template('index.html')
 
 if __name__ == '__main__':
-    #create_table.main() # La decommenter pour lancer la creation de la table
+    create_table.main()
     t = threading.Thread(target=batch.main)
     t.start()
     app.run(debug=True)

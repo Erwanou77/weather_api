@@ -1,5 +1,5 @@
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from dotenv import load_dotenv
 import os
 
@@ -17,6 +17,22 @@ def main():
 
     # Step 3: Create a table
     table_name = "city"
+    inspector = inspect(engine)
+    
+    if inspector.has_table(table_name):
+        print(f"Table '{table_name}' existe déjà.")
+
+        with engine.connect() as connection:
+            result = connection.execute(text(f"SELECT COUNT(*) FROM {table_name}"))
+            row_count = result.fetchone()[0]
+            if row_count > 0:
+                print(f"Table '{table_name}' à déjà des données.")
+                return
+            else:
+                print(f"Table '{table_name}' est vide.")
+    else:
+        print(f"Table '{table_name}' n'existe pas.")
+
     df.to_sql(name=table_name, con=engine, if_exists='replace', index=False)
     
     print("Data inserted successfully")
