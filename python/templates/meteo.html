@@ -83,9 +83,8 @@
                     const suggestion = document.createElement('div');
                     suggestion.classList.add('autocomplete-suggestion');
                     suggestion.textContent = list_item; // Adjust to your data structure
-                    suggestion.addEventListener('click', function(e) {
-                        
-                        window.location.href = `${window.location.host}/${e.target.innerHTML}`;
+                    suggestion.addEventListener('click', function() {
+                        window.location.href = `/${encodeURIComponent(list_item)}`;
                     });
                     autocompleteList.appendChild(suggestion);
                 });
