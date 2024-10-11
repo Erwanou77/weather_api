@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, jsonify
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
-import os, create_table, datetime, threading, batch, requests
+import os, create_table, datetime, json, threading, batch, requests
 from pymongo import MongoClient
 
 # Load environment variables from .env file
@@ -28,7 +28,7 @@ def index():
 def search():
     data = request.get_json()
     query = f"%{data.get('query', '').strip()}%"
-    
+    results = []
     with Session() as session:
         
         # Cherche dans notre base si les données existe
@@ -46,8 +46,9 @@ def search():
         rows = result.fetchall()
 
         if rows:
-            keys = result.keys()
-            return jsonify([dict(zip(keys, row)) for row in rows])
+            for row in rows:
+                results.append(json.dumps(list(row)))
+            return results
 
         # Recherche dans l'api de l'état pour vérifier si l'adresse existe
         api_response = requests.get(f"https://api-adresse.data.gouv.fr/search/?q={data['query']}&limit=20")
