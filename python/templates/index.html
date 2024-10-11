@@ -85,7 +85,7 @@
                     suggestion.textContent = list_item; // Adjust to your data structure
                     suggestion.addEventListener('click', function(e) {
                         
-                        window.location.href = `${window.location.host}/${e.target.innerHTML}`;
+                        window.location.href = `${window.location.protocol}//${window.location.host}/${encodeURIComponent(e.target.innerHTML)}`;
                     });
                     autocompleteList.appendChild(suggestion);
                 });
