@@ -2,7 +2,9 @@ from flask import Flask, render_template, request, jsonify
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
-import os, create_table, json, threading, batch
+import os, create_table, json, datetime, threading, batch, requests
+from pymongo import MongoClient
+
 # Load environment variables from .env file
 load_dotenv()
 app = Flask(__name__)
@@ -12,7 +14,11 @@ db_url = f"mysql+pymysql://{os.getenv('MYSQL_USERNAME')}:{os.getenv('MYSQL_PASSW
          f"{os.getenv('MYSQL_HOST')}:{os.getenv('MYSQL_PORT')}/{os.getenv('DBNAME')}"
 engine = create_engine(db_url)
 Session = sessionmaker(bind=engine)
+client = MongoClient(f'mongodb://{os.getenv("MONGO_USERNAME")}:{os.getenv("MONGO_PASSWORD")}@{os.getenv("MONGO_HOST")}:{os.getenv("MONGO_PORT")}/')
+db = client[os.getenv('DBNAME')]
 table = 'city'
+
+
 
 @app.route('/',methods=['GET'])
 def index():
@@ -53,7 +59,7 @@ def search():
 
     return jsonify(results)
 
-@app.route('/<identifiant>',methods=['GET'])
+@app.route('/<string:identifiant>',methods=['GET'])
 def meteo(identifiant):
     session = Session()
     identifiant = [i.strip() for i in identifiant.split(',')]
@@ -67,21 +73,63 @@ def meteo(identifiant):
     req = session.execute(query_sql, {'search_term': identifiant})
 
     row = req.fetchone()
+    if not row:
+        return render_template('meteo404.html')
 
     return render_template('meteo.html', result=identifiant, lat=row[0], lon=row[1])
+
+
 @app.route('/api/<longitude>/<latitude>',methods=['GET'])
 def api_meteo(longitude,latitude):
-    response = requests.get(f'{url}?appid={key}&exclude=minutely,hourly,daily,alerts&units=metric&lang=fr&lat={row[1]}&lon={row[0]}')
+    url = os.getenv('API_URL')
+    response = requests.get(f'{url}&latitude={latitude}&longitude={longitude}')
     if response.status_code == 200:
-        data = response.json()
+        data = response.json()['current']
+        collection_name = datetime.datetime.now().strftime('%Y-%m-%d')
+        collection = db[collection_name]
+        collection.insert_one({
+                        'temp': data['temperature_2m'],
+                        'wind_speed': data['wind_speed_10m'],
+                        'wind_direction': data['wind_direction_10m'],
+                        'humidity': data['relative_humidity_2m'],
+                        'lat': latitude,
+                        'lon': longitude,
+                        'time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    })
+    
+        collection.create_index('time')
+        collection.create_index([('lat', 1), ('lon', 1)])
         return jsonify({
-            'temp': data['main']['temp'],
-            'description': data['weather'][0]['description'],
-            'humidity': data['main']['humidity'],
-            'lat': data['coord']['lat'],
-            'lon': data['coord']['lon'],
-            'time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        })
+                        'temp': data['temperature_2m'],
+                        'wind_speed': data['wind_speed_10m'],
+                        'wind_direction': data['wind_direction_10m'],
+                        'humidity': data['relative_humidity_2m'],
+                    })
+    else:
+        try:
+            today = datetime.datetime.now()
+        
+            for days_ago in range(0, 365):  # Check up to a year in the past
+                date_to_check = today - datetime.timedelta(days=days_ago)
+                collection_name = date_to_check.strftime('%Y-%m-%d')
+                collection = db[collection_name]
+            
+            # Search for weather data in this collection
+                weather_data = collection.find_one(
+                    {'lat': latitude, 'lon': longitude},
+                    sort=[('time', -1)]  # Get the latest entry by 'time'
+                )
+            
+                if weather_data:
+                    # Remove MongoDB-specific fields before returning
+                    del weather_data['_id']
+                    del weather_data['time']
+                    del weather_data['lat']
+                    del weather_data['lon']
+                    return jsonify(weather_data)
+        except Exception as e:
+            pass
+        return jsonify({})
     
 
 
